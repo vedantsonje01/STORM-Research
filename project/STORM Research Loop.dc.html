@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.15} }
+    body { margin: 0; background: #0A0A0F; }
+    * { box-sizing: border-box; }
+    ::placeholder { color: #3D3A4D; opacity: 1; }
+    ::selection { background: rgba(108,92,231,0.3); color: #F0EFFE; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1E1E2E; border-radius: 4px; }
+  </style>
+</helmet>
+
+<div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; max-width: 800px; margin: 0 auto; padding: 56px 24px 80px; color: #F0EFFE; min-height: 100vh;">
+
+  <!-- Accent bar -->
+  <div style="width: 48px; height: 3px; background: linear-gradient(90deg, #6C5CE7, #A29BFE); margin-bottom: 32px; border-radius: 2px;"></div>
+
+  <!-- Header -->
+  <div style="margin-bottom: 48px;">
+    <h1 style="font-family: 'Anthropic Serif', 'Instrument Serif', Georgia, serif; font-size: 52px; font-weight: 400; margin: 0 0 6px; letter-spacing: -0.04em; color: #F0EFFE; line-height: 1;">STORM</h1>
+    <div style="font-size: 11px; font-weight: 600; color: #6E6B7B; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 24px;">Research Loop</div>
+    <p style="font-size: 14px; color: #6E6B7B; margin: 0; line-height: 1.75; max-width: 580px; text-wrap: pretty;">
+      Multi-agent research pipeline — 5 AI agents analyze your topic from multiple perspectives, map contradictions, synthesize findings, and self-grade until quality threshold is met.
+    </p>
+    <sc-if value="{{ showInputBanner }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top: 20px; padding: 12px 16px; border-radius: 8px; background: #1A1040; border: 1px solid rgba(108,92,231,0.2); font-size: 12px; color: #A29BFE; line-height: 1.55; display: inline-block;">
+        Preview mode — UI is fully interactive. Live AI calls activate in Claude Code with Gemini backend.
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- ═══════════ INPUT PHASE ═══════════ -->
+  <sc-if value="{{ isInput }}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-direction: column; gap: 28px;">
+      <div>
+        <label style="font-size: 11px; font-weight: 600; color: #6E6B7B; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; display: block;">Research Topic</label>
+        <textarea value="{{ topic }}" onChange="{{ onTopicChange }}" placeholder="e.g., The impact of remote work on innovation in tech companies" rows="2" style="font-family: 'Inter', sans-serif; font-size: 14px; padding: 14px 16px; border: 1px solid #1E1E2E; border-radius: 10px; background: #0D0D14; color: #F0EFFE; outline: none; width: 100%; resize: vertical; min-height: 64px; transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.6;" style-focus="border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.1);"></textarea>
+      </div>
+      <div>
+        <label style="font-size: 11px; font-weight: 600; color: #6E6B7B; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; display: block;">Your Role</label>
+        <input type="text" value="{{ role }}" onChange="{{ onRoleChange }}" placeholder="e.g., Product Manager, Startup Founder, Student" style="font-family: 'Inter', sans-serif; font-size: 14px; padding: 14px 16px; border: 1px solid #1E1E2E; border-radius: 10px; background: #0D0D14; color: #F0EFFE; outline: none; width: 100%; transition: border-color 0.2s, box-shadow 0.2s;" style-focus="border-color: #6C5CE7; box-shadow: 0 0 0 3px rgba(108,92,231,0.1);">
+      </div>
+
+      <sc-if value="{{ hasError }}">
+        <div style="padding: 12px 16px; border-radius: 10px; background: rgba(231,76,60,0.06); border: 1px solid rgba(231,76,60,0.15); color: #E74C3C; font-size: 13px; line-height: 1.5;">{{ error }}</div>
+      </sc-if>
+
+      <button onClick="{{ generatePerspectives }}" disabled="{{ generateDisabled }}" style="font-family: 'Inter', sans-serif; padding: 16px 40px; border-radius: 999px; border: none; color: {{ generateColor }}; font-weight: 600; font-size: 14px; cursor: pointer; background: {{ generateBg }}; transition: all 0.25s; letter-spacing: 0.01em; margin-top: 4px; align-self: flex-start;" style-hover="transform: translateY(-1px); box-shadow: 0 6px 24px rgba(108,92,231,0.35);">
+        Generate Perspectives →
+      </button>
+    </div>
+  </sc-if>
+
+  <!-- ═══════════ PERSPECTIVES PHASE ═══════════ -->
+  <sc-if value="{{ isPerspectives }}">
+    <div>
+      <div style="margin-bottom: 28px;">
+        <h2 style="font-family: 'Anthropic Serif', 'Instrument Serif', Georgia, serif; font-size: 32px; font-weight: 400; margin: 0 0 8px; letter-spacing: -0.03em; color: #F0EFFE;">Select 5 Perspectives</h2>
+        <p style="font-size: 13px; color: #6E6B7B; margin: 0; line-height: 1.5;">
+          {{ selectedCount }}/5 selected — mix STORM defaults with AI-generated custom perspectives
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 32px;">
+        <sc-for list="{{ perspectives }}" as="p" hint-placeholder-count="5">
+          <button onClick="{{ p.toggle }}" style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; border: 1px solid {{ p.borderColor }}; background: {{ p.bgColor }}; cursor: {{ p.cursor }}; opacity: {{ p.opacity }}; text-align: left; transition: all 0.3s ease; min-height: 92px; font-family: 'Inter', sans-serif; pointer-events: {{ p.pointerEvents }};" style-hover="box-shadow: 0 0 32px rgba(108,92,231,0.18); border-color: #A29BFE;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{ p.badgeColor }}; background: {{ p.badgeBg }}; padding: 3px 9px; border-radius: 4px; line-height: 1.4;">{{ p.badgeText }}</span>
+              <sc-if value="{{ p.showCheck }}">
+                <span style="margin-left: auto; color: #A29BFE; font-size: 16px; font-weight: 700;">✓</span>
+              </sc-if>
+            </div>
+            <span style="font-weight: 600; font-size: 14px; color: #F0EFFE; line-height: 1.35;">{{ p.label }}</span>
+            <span style="font-size: 12px; color: #6E6B7B; line-height: 1.5;">{{ p.desc }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ hasError }}">
+        <div style="padding: 12px 16px; border-radius: 10px; background: rgba(231,76,60,0.06); border: 1px solid rgba(231,76,60,0.15); color: #E74C3C; font-size: 13px; margin-bottom: 16px;">{{ error }}</div>
+      </sc-if>
+
+      <div style="display: flex; gap: 12px;">
+        <button onClick="{{ goBack }}" style="font-family: 'Inter', sans-serif; padding: 14px 28px; border-radius: 999px; border: 1px solid #1E1E2E; background: transparent; color: #F0EFFE; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;" style-hover="border-color: #6C5CE7; color: #A29BFE;">← Back</button>
+        <button onClick="{{ runLoop }}" disabled="{{ runDisabled }}" style="font-family: 'Inter', sans-serif; flex: 1; padding: 14px 28px; border-radius: 999px; border: none; color: {{ runColor }}; font-weight: 600; font-size: 14px; cursor: pointer; background: {{ runBg }}; transition: all 0.25s;" style-hover="transform: translateY(-1px); box-shadow: 0 6px 24px rgba(108,92,231,0.35);">
+          Run Research Loop →
+        </button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ═══════════ RUNNING / DONE PHASE ═══════════ -->
+  <sc-if value="{{ isRunningOrDone }}">
+    <div>
+      <!-- Status Bar -->
+      <div style="display: flex; align-items: center; gap: 20px; padding: 16px 20px; border-radius: 12px; background: #13131A; border: 1px solid #1E1E2E; margin-bottom: 24px; flex-wrap: wrap;">
+        <div style="font-size: 13px; color: #F0EFFE;">
+          <span style="font-weight: 500; color: #6E6B7B; margin-right: 4px;">Loop</span> {{ loopDisplay }} / 3
+        </div>
+        <sc-if value="{{ hasGrade }}">
+          <div style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
+            <span style="font-weight: 500; color: #6E6B7B;">Grade</span>
+            <span style="color: {{ gradeColor }}; font-weight: 700;">{{ gradeText }}</span>
+            <span style="color: #6E6B7B; font-size: 12px;">{{ gradeLabel }}</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasStatusMsg }}">
+          <div style="font-size: 12px; color: #4A4758; font-style: italic;">{{ statusMsg }}</div>
+        </sc-if>
+        <sc-if value="{{ isDone }}">
+          <button onClick="{{ resetAll }}" style="margin-left: auto; padding: 8px 22px; border-radius: 999px; border: 1px solid rgba(108,92,231,0.25); background: transparent; color: #A29BFE; font-weight: 600; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s;" style-hover="border-color: #6C5CE7; background: rgba(108,92,231,0.06);">New Research</button>
+        </sc-if>
+      </div>
+
+      <!-- Agent Status Pills -->
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px;">
+        <sc-for list="{{ agents }}" as="a" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; font-size: 11px; font-weight: 600; background: {{ a.pillBg }}; color: {{ a.pillColor }}; box-shadow: {{ a.pillShadow }}; transition: all 0.35s ease; letter-spacing: 0.02em;">
+            <span style="font-size: 12px;">{{ a.icon }}</span>
+            <span>{{ a.name }}</span>
+            <sc-if value="{{ a.active }}">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; animation: pulse 1.2s infinite; margin-left: 2px;"></span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Output Panels -->
+      <sc-for list="{{ panels }}" as="panel" hint-placeholder-count="3">
+        <div style="border: 1px solid #1E1E2E; border-radius: 12px; margin-bottom: 12px; overflow: hidden; background: #13131A; border-left-width: 3px; border-left-style: solid; border-left-color: {{ panel.borderLeftColor }}; transition: border-left-color 0.3s ease;">
+          <button onClick="{{ panel.toggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 16px 20px; background: none; border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: #F0EFFE; text-align: left;" style-hover="background: rgba(108,92,231,0.03);">
+            <span style="font-size: 15px; color: #6C5CE7;">{{ panel.icon }}</span>
+            <span style="flex: 1;">{{ panel.label }}</span>
+            <span style="font-size: 10px; color: #4A4758;">{{ panel.chevron }}</span>
+          </button>
+          <sc-if value="{{ panel.isOpen }}">
+            <div style="padding: 0 20px 20px 20px; font-size: 13.5px; line-height: 1.85; color: #9995A8; white-space: pre-wrap; word-break: break-word; max-height: 500px; overflow-y: auto; border-top: 1px solid #1E1E2E;">{{ panel.content }}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+
+      <!-- Loop History -->
+      <sc-if value="{{ hasLoopHistory }}">
+        <div style="margin-top: 32px;">
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 14px; color: #6E6B7B;">Loop History</div>
+          <sc-for list="{{ loopHistoryItems }}" as="lh">
+            <div style="padding: 12px 16px; border-radius: 10px; background: #13131A; border: 1px solid #1E1E2E; margin-bottom: 8px; font-size: 13px; display: flex; align-items: center; gap: 14px;">
+              <span style="font-weight: 600; color: #F0EFFE;">Loop {{ lh.loop }}</span>
+              <span style="color: {{ lh.gradeColor }}; font-weight: 600;">Grade: {{ lh.gradeText }}</span>
+              <sc-if value="{{ lh.passed }}">
+                <span style="color: #5CE7C0;">✓</span>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- Completion Banner -->
+      <sc-if value="{{ isDone }}">
+        <div style="margin-top: 32px; padding: 28px; border-radius: 12px; background: {{ completionBg }}; border: 1px solid {{ completionBorder }};">
+          <div style="font-family: 'Anthropic Serif', 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 22px; margin-bottom: 10px; color: {{ completionTitleColor }}; letter-spacing: -0.02em; line-height: 1.3;">{{ completionTitle }}</div>
+          <div style="font-size: 13px; color: #6E6B7B; line-height: 1.65;">{{ completionDesc }}</div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: &quot;100vh&quot; },
+  &quot;qualityThreshold&quot;: {
+    &quot;editor&quot;: &quot;float&quot;,
+    &quot;default&quot;: 8.5,
+    &quot;min&quot;: 6,
+    &quot;max&quot;: 10,
+    &quot;step&quot;: 0.5,
+    &quot;tsType&quot;: &quot;number&quot;
+  },
+  &quot;showPreviewBanner&quot;: {
+    &quot;editor&quot;: &quot;boolean&quot;,
+    &quot;default&quot;: true,
+    &quot;tsType&quot;: &quot;boolean&quot;
+  }
+}">
+
+class Component extends DCLogic {
+  _timeouts = [];
+
+  state = {
+    topic: "",
+    role: "",
+    phase: "input",
+    allPerspectives: [],
+    selectedIds: [],
+    currentAgent: null,
+    outputs: {},
+    loopCount: 0,
+    loopHistory: [],
+    grade: null,
+    error: null,
+    statusMsg: "",
+    openPanels: {},
+  };
+
+  componentWillUnmount() {
+    this._timeouts.forEach(function(t) { clearTimeout(t); });
+  }
+
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var threshold = this.props.qualityThreshold ?? 8.5;
+    var showBanner = this.props.showPreviewBanner !== false;
+
+    var DEFAULT_PERSPECTIVES = [
+      { id: "practitioner", label: "The Practitioner", desc: "Works with this daily \u2014 knows what academics miss", group: "storm" },
+      { id: "academic", label: "The Academic", desc: "Peer-reviewed evidence over popular belief", group: "storm" },
+      { id: "skeptic", label: "The Skeptic", desc: "Strongest counterarguments to mainstream views", group: "storm" },
+      { id: "economist", label: "The Economist", desc: "Follows the money and financial incentives", group: "storm" },
+      { id: "historian", label: "The Historian", desc: "Historical parallels and pattern recognition", group: "storm" },
+    ];
+
+    var DEMO_CUSTOM = [
+      { id: "custom_0", label: "The Technologist", desc: "How emerging tech reshapes the landscape", group: "custom" },
+      { id: "custom_1", label: "The Ethicist", desc: "Moral implications and societal responsibilities", group: "custom" },
+      { id: "custom_2", label: "The End User", desc: "Lived experience of people directly affected", group: "custom" },
+      { id: "custom_3", label: "The Regulator", desc: "Policy frameworks and governance gaps", group: "custom" },
+      { id: "custom_4", label: "The Futurist", desc: "Where this is heading in 5\u201310 years", group: "custom" },
+    ];
+
+    var AGENT_LABELS = [
+      { key: "agent0", name: "Perspective Generator", icon: "\u25CE" },
+      { key: "agent1", name: "Multi-Perspective Research", icon: "\u25C8" },
+      { key: "agent2", name: "Contradiction Mapper", icon: "\u25C7" },
+      { key: "agent3", name: "Research Synthesizer", icon: "\u25C6" },
+      { key: "agent4", name: "Peer Reviewer", icon: "\u2605" },
+    ];
+
+    var isInput = s.phase === "input";
+    var isPerspectives = s.phase === "perspectives";
+    var isRunningOrDone = s.phase === "running" || s.phase === "done";
+    var isDone = s.phase === "done";
+    var canGenerate = !!s.topic && !!s.role;
+    var canRun = s.selectedIds.length === 5;
+
+    var perspectives = s.allPerspectives.map(function(p) {
+      var sel = s.selectedIds.indexOf(p.id) !== -1;
+      var dis = s.selectedIds.length >= 5 && !sel;
+      var storm = p.group === "storm";
+      return {
+        id: p.id, label: p.label, desc: p.desc,
+        selected: sel,
+        borderColor: sel ? "#6C5CE7" : "#1E1E2E",
+        bgColor: sel ? "rgba(108,92,231,0.08)" : "#13131A",
+        opacity: dis ? 0.3 : 1,
+        cursor: dis ? "not-allowed" : "pointer",
+        pointerEvents: dis ? "none" : "auto",
+        badgeBg: storm ? "#1A1040" : "#001A14",
+        badgeColor: storm ? "#A29BFE" : "#5CE7C0",
+        badgeText: storm ? "STORM" : "CUSTOM",
+        showCheck: sel,
+        toggle: function() {
+          self.setState(function(prev) {
+            if (prev.selectedIds.indexOf(p.id) !== -1) {
+              return { selectedIds: prev.selectedIds.filter(function(x) { return x !== p.id; }) };
+            }
+            if (prev.selectedIds.length >= 5) return {};
+            return { selectedIds: prev.selectedIds.concat([p.id]) };
+          });
+        },
+      };
+    });
+
+    var agents = AGENT_LABELS.map(function(a) {
+      var done = !!s.outputs[a.key];
+      var active = s.currentAgent === a.key;
+      return {
+        key: a.key, name: a.name, icon: a.icon,
+        active: active, done: done,
+        pillBg: active ? "linear-gradient(135deg, #6C5CE7, #7C6CF7)" : done ? "rgba(108,92,231,0.12)" : "#1E1E2E",
+        pillColor: active ? "#FFFFFF" : done ? "#A29BFE" : "#4A4758",
+        pillShadow: active ? "0 0 20px rgba(108,92,231,0.5)" : "none",
+      };
+    });
+
+    var panels = AGENT_LABELS
+      .filter(function(a) { return !!s.outputs[a.key]; })
+      .map(function(a) {
+        return {
+          key: a.key, label: a.name, icon: a.icon,
+          content: s.outputs[a.key],
+          isOpen: !!s.openPanels[a.key],
+          chevron: s.openPanels[a.key] ? "\u25B2" : "\u25BC",
+          borderLeftColor: s.openPanels[a.key] ? "#6C5CE7" : "transparent",
+          toggle: function() {
+            self.setState(function(prev) {
+              var next = {};
+              for (var k in prev.openPanels) next[k] = prev.openPanels[k];
+              next[a.key] = !prev.openPanels[a.key];
+              return { openPanels: next };
+            });
+          },
+        };
+      });
+
+    var loopHistoryItems = s.loopHistory.map(function(lh) {
+      return {
+        loop: lh.loop,
+        gradeText: lh.grade !== null ? lh.grade + "/10" : "N/A",
+        gradeColor: lh.grade >= threshold ? "#5CE7C0" : "#E17055",
+        passed: lh.grade >= threshold,
+      };
+    });
+
+    var gradePass = s.grade !== null && s.grade >= threshold;
+
+    return {
+      isInput: isInput,
+      isPerspectives: isPerspectives,
+      isRunningOrDone: isRunningOrDone,
+      isDone: isDone,
+      showInputBanner: isInput && showBanner,
+
+      topic: s.topic,
+      role: s.role,
+      onTopicChange: function(e) { self.setState({ topic: e.target.value }); },
+      onRoleChange: function(e) { self.setState({ role: e.target.value }); },
+
+      generatePerspectives: function() {
+        if (!self.state.topic || !self.state.role) {
+          self.setState({ error: "Please fill in all fields to preview the flow." });
+          return;
+        }
+        self.setState({
+          error: null,
+          allPerspectives: DEFAULT_PERSPECTIVES.concat(DEMO_CUSTOM),
+          selectedIds: DEFAULT_PERSPECTIVES.map(function(p) { return p.id; }),
+          outputs: { agent0: "Generated 5 custom perspectives for \u201C" + self.state.topic + "\u201D (demo mode \u2014 live generation requires backend)" },
+          phase: "perspectives",
+        });
+      },
+      canGenerate: canGenerate,
+      generateDisabled: !canGenerate,
+      generateBg: canGenerate ? "linear-gradient(135deg, #6C5CE7 0%, #7C6CF7 100%)" : "#1E1E2E",
+      generateColor: canGenerate ? "#FFFFFF" : "#4A4758",
+
+      runLoop: function() {
+        if (self.state.selectedIds.length !== 5) {
+          self.setState({ error: "Please select exactly 5 perspectives." });
+          return;
+        }
+        var sel = self.state.selectedIds.map(function(id) {
+          return self.state.allPerspectives.find(function(p) { return p.id === id; });
+        });
+        var names = sel.map(function(p) { return p.label; }).join(", ");
+        var tp = self.state.topic;
+        var rl = self.state.role;
+
+        self._timeouts.forEach(function(t) { clearTimeout(t); });
+        self._timeouts = [];
+
+        self.setState({
+          error: null, phase: "running", currentAgent: "agent1",
+          statusMsg: "Loop 1: Researching from 5 perspectives...",
+        });
+
+        var steps = [
+          { key: "agent1", delay: 1200, output: "Multi-perspective analysis of \u201C" + tp + "\u201D from: " + names + "\n\nEach perspective provided:\n\u2022 Core position (2 sentences)\n\u2022 Strongest supporting evidence\n\u2022 Unique insight no other perspective offers\n\n[Full research output will appear here when connected to Gemini backend in Claude Code]" },
+          { key: "agent2", delay: 2400, output: "Contradiction map for \u201C" + tp + "\u201D:\n\n1. DIRECT CONTRADICTIONS: Identified conflicts between perspectives\n2. EVIDENCE STRENGTH: Ranked perspectives by evidence quality\n3. KEY QUESTION: The one question that resolves the biggest conflict\n4. CONSENSUS: What all perspectives agree on\n5. BLIND SPOTS: What nobody addressed\n\n[Full analysis will appear here when connected to Gemini backend]" },
+          { key: "agent3", delay: 3600, output: "Research briefing on \u201C" + tp + "\u201D for role: " + rl + "\n\n1. CEO SUMMARY: One paragraph with nuance\n2. 5 KEY FINDINGS: Ranked by reliability\n3. HIDDEN CONNECTION: Non-obvious link across perspectives\n4. ACTIONABLE INSIGHT: What a " + rl + " should do differently\n5. FRONTIER QUESTION: The question that changes everything\n\n[Full synthesis will appear here when connected to Gemini backend]" },
+          { key: "agent4", delay: 4800, output: "Peer review of research briefing:\n\n1. CONFIDENCE SCORES: Each finding rated 1-10\n2. WEAKEST LINK: Least confident claim identified\n3. BIAS CHECK: Perspective balance assessment\n4. MISSING PERSPECTIVE: Suggested 6th angle\n5. OVERALL GRADE: 8.7/10\n\n[Full peer review will appear here when connected to Gemini backend]" },
+        ];
+
+        steps.forEach(function(step) {
+          var t1 = setTimeout(function() {
+            var agentName = AGENT_LABELS.find(function(a) { return a.key === step.key; });
+            self.setState({ currentAgent: step.key, statusMsg: "Loop 1: Running " + (agentName ? agentName.name : step.key) + "..." });
+            var t2 = setTimeout(function() {
+              self.setState(function(prev) {
+                var out = {};
+                for (var k in prev.outputs) out[k] = prev.outputs[k];
+                out[step.key] = step.output;
+                return { outputs: out };
+              });
+            }, 400);
+            self._timeouts.push(t2);
+          }, step.delay);
+          self._timeouts.push(t1);
+        });
+
+        var tFinal = setTimeout(function() {
+          self.setState({
+            currentAgent: null, loopCount: 1, grade: 8.7,
+            loopHistory: [{ loop: 1, grade: 8.7 }],
+            statusMsg: "Quality threshold met!",
+            phase: "done",
+            openPanels: { agent3: true, agent4: true },
+          });
+        }, 5600);
+        self._timeouts.push(tFinal);
+      },
+      canRun: canRun,
+      runDisabled: !canRun,
+      runBg: canRun ? "linear-gradient(135deg, #6C5CE7 0%, #7C6CF7 100%)" : "#1E1E2E",
+      runColor: canRun ? "#FFFFFF" : "#4A4758",
+
+      goBack: function() { self.setState({ phase: "input", error: null }); },
+      resetAll: function() {
+        self._timeouts.forEach(function(t) { clearTimeout(t); });
+        self._timeouts = [];
+        self.setState({
+          phase: "input", topic: "", role: "",
+          allPerspectives: [], selectedIds: [],
+          currentAgent: null, outputs: {},
+          loopCount: 0, loopHistory: [], grade: null,
+          error: null, statusMsg: "", openPanels: {},
+        });
+      },
+
+      error: s.error,
+      hasError: !!s.error,
+      perspectives: perspectives,
+      selectedCount: s.selectedIds.length,
+      agents: agents,
+      panels: panels,
+
+      loopDisplay: s.loopCount || "...",
+      hasGrade: s.grade !== null,
+      gradeText: s.grade !== null ? s.grade + "/10" : "",
+      gradePass: gradePass,
+      gradeColor: gradePass ? "#5CE7C0" : "#E17055",
+      gradeLabel: gradePass ? "\u2713 Threshold met" : "\u2014 below " + threshold,
+      statusMsg: s.statusMsg,
+      hasStatusMsg: !!s.statusMsg,
+
+      loopHistoryItems: loopHistoryItems,
+      hasLoopHistory: s.loopHistory.length > 1,
+
+      completionBg: gradePass ? "rgba(92,231,192,0.04)" : "rgba(225,168,72,0.04)",
+      completionBorder: gradePass ? "rgba(92,231,192,0.15)" : "rgba(225,168,72,0.15)",
+      completionTitleColor: gradePass ? "#5CE7C0" : "#E1A948",
+      completionTitle: gradePass
+        ? "Research complete \u2014 Grade " + s.grade + "/10"
+        : "Research stopped after " + s.loopCount + (s.loopCount > 1 ? " loops" : " loop") + " \u2014 Best grade: " + (s.grade != null ? s.grade : "N/A") + "/10",
+      completionDesc: gradePass
+        ? "Quality threshold met. Open the Research Synthesizer and Peer Reviewer panels for your full briefing."
+        : "Max loops reached. The briefing above is the best result achieved.",
+    };
+  }
+}
+
+</script>
+</body>
+</html>
