@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -12,8 +12,8 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const MODEL = 'llama-3.3-70b-versatile';
 
 // ── Perspectives endpoint ────────────────────────────────────────────────────
 
@@ -23,24 +23,30 @@ app.post('/api/perspectives', async (req, res) => {
 
   const prompt = `You are a research strategist. For the topic "${topic}", generate exactly 5 distinct analytical perspectives that would produce the most comprehensive and insightful research.
 
-Return ONLY a JSON array of 5 objects, each with:
-- "id": a short camelCase identifier (e.g. "techOptimist")
-- "name": a 1-3 word perspective label (e.g. "Tech Optimist")
-- "description": one sentence describing what this lens examines
+CRITICAL CONSTRAINT: The following 5 default perspectives ALREADY EXIST and will be shown alongside yours. Your 5 perspectives must be COMPLETELY DIFFERENT — no overlap, no tangential relatedness, no rewording of the same angle:
+1. Practitioner — real-world implementation, practical challenges, ground-level insights
+2. Academic — theoretical frameworks, peer-reviewed research, scholarly analysis
+3. Skeptic — assumptions, limitations, risks, counterarguments
+4. Economist — incentives, resource allocation, market dynamics, economic impacts
+5. Historian — historical context, precedents, evolution over time
 
-Example format:
-[
-  { "id": "techOptimist", "name": "Tech Optimist", "description": "Examines how emerging technologies create new possibilities and solutions." },
-  ...
-]
+Your perspectives must explore angles that NONE of the above cover. Think about dimensions like: cultural/social impact, ethical/philosophical implications, future forecasting, geopolitical factors, environmental sustainability, psychological/behavioral aspects, technological disruption, legal/regulatory landscape, design/user experience, etc. Pick whatever 5 are most relevant to the topic — just ensure zero overlap with the defaults.
+
+Return ONLY a JSON array of 5 objects, each with:
+- "id": a short camelCase identifier (e.g. "ethicist")
+- "name": a 1-3 word perspective label (e.g. "Ethicist")
+- "description": one sentence describing what this lens examines
 
 Topic: ${topic}
 Return ONLY the JSON array, no other text.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
-    // Strip markdown code blocks if present
+    const result = await groq.chat.completions.create({
+      model: MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+    });
+    let text = result.choices[0].message.content.trim();
     text = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
     const perspectives = JSON.parse(text);
     res.json({ perspectives });
@@ -147,28 +153,39 @@ End your response with exactly: GRADE: X.X/10`,
     },
   };
 
-  const streamAgent = async (agentKey, prompt, loop) => {
-    send({ type: 'agent_start', agent: agentKey, loop });
-    let fullText = '';
-    try {
-      const result = await model.generateContentStream(prompt);
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
-        if (text) {
-          fullText += text;
-          send({ type: 'agent_chunk', agent: agentKey, chunk: text });
+  const streamAgent = async (agentKey, prompt, loop, maxRetries = 2) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      send({ type: 'agent_start', agent: agentKey, loop });
+      let fullText = '';
+      try {
+        const stream = await groq.chat.completions.create({
+          model: MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          stream: true,
+        });
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content || '';
+          if (text) {
+            fullText += text;
+            send({ type: 'agent_chunk', agent: agentKey, chunk: text });
+          }
         }
+        send({ type: 'agent_done', agent: agentKey });
+        return fullText;
+      } catch (err) {
+        if (attempt < maxRetries) {
+          console.warn(`${agentKey} attempt ${attempt} failed, retrying: ${err.message}`);
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+          continue;
+        }
+        send({ type: 'error', message: `${agentKey} failed after ${maxRetries} attempts: ${err.message}` });
+        throw err;
       }
-    } catch (err) {
-      send({ type: 'error', message: `${agentKey} failed: ${err.message}` });
-      throw err;
     }
-    send({ type: 'agent_done', agent: agentKey });
-    return fullText;
   };
 
   try {
-    // Agent 0 runs once (perspective intro)
     const agent0Out = await streamAgent('agent0', AGENTS.agent0.buildPrompt(), 0);
 
     let prevReviewFeedback = '';
@@ -183,7 +200,6 @@ End your response with exactly: GRADE: X.X/10`,
       const agent3Out = await streamAgent('agent3', AGENTS.agent3.buildPrompt(agent1Out, agent2Out), loop);
       const agent4Out = await streamAgent('agent4', AGENTS.agent4.buildPrompt(agent3Out), loop);
 
-      // Extract grade
       const gradeMatch = agent4Out.match(/GRADE:\s*(\d+\.?\d*)\/10/i);
       const grade = gradeMatch ? parseFloat(gradeMatch[1]) : 0;
       const passed = grade >= qualityThreshold;

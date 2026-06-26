@@ -1,24 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 
 const AGENT_META = {
-  agent0: { icon: '◎', label: 'Perspective Generator' },
-  agent1: { icon: '◈', label: 'Multi-Perspective Research' },
-  agent2: { icon: '◇', label: 'Contradiction Mapper' },
-  agent3: { icon: '◆', label: 'Research Synthesizer' },
-  agent4: { icon: '★', label: 'Peer Reviewer' },
+  agent0: { icon: '◎', label: 'Perspective Generator', short: 'Perspectives' },
+  agent1: { icon: '◈', label: 'Multi-Perspective Research', short: 'Research' },
+  agent2: { icon: '◇', label: 'Contradiction Mapper', short: 'Contradictions' },
+  agent3: { icon: '◆', label: 'Research Synthesizer', short: 'Synthesis' },
+  agent4: { icon: '★', label: 'Peer Reviewer', short: 'Review' },
 };
 
-export default function OutputPanel({ agentKey, output, status, loop }) {
+export default function OutputPanel({ agentKey, output, status, loop, onToast }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const bodyRef = useRef(null);
-  const meta = AGENT_META[agentKey] || { icon: '○', label: agentKey };
+  const meta = AGENT_META[agentKey] || { icon: '○', label: agentKey, short: agentKey };
 
-  // Auto-open when streaming starts
   useEffect(() => {
     if (status === 'streaming') setOpen(true);
   }, [status]);
 
-  // Auto-scroll while streaming
   useEffect(() => {
     if (status === 'streaming' && bodyRef.current && open) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -29,20 +28,31 @@ export default function OutputPanel({ agentKey, output, status, loop }) {
   const isStreaming = status === 'streaming';
   const isDone = status === 'done';
 
+  const handleCopy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      onToast?.({ type: 'success', message: `${meta.short} copied to clipboard` });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      onToast?.({ type: 'error', message: 'Failed to copy' });
+    }
+  };
+
   return (
     <div
       className="fade-in-up"
       style={{
-        background: '#13131A',
-        border: '1px solid #1E1E2E',
-        borderLeft: `3px solid ${isDone ? '#6C5CE7' : isStreaming ? '#A29BFE' : '#2A2A3E'}`,
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderLeft: `3px solid ${isDone ? 'var(--accent)' : isStreaming ? 'var(--lavender)' : '#1E1E2E'}`,
         borderRadius: '8px',
         overflow: 'hidden',
-        transition: 'border-color 0.3s ease',
+        transition: 'all 0.3s ease',
         opacity: isEmpty && !isStreaming ? 0.45 : 1,
       }}
     >
-      {/* Header */}
       <button
         onClick={() => !isEmpty && setOpen((o) => !o)}
         disabled={isEmpty}
@@ -59,68 +69,70 @@ export default function OutputPanel({ agentKey, output, status, loop }) {
           textAlign: 'left',
         }}
       >
-        {/* Status indicator */}
         <span
           style={{
             width: 8,
             height: 8,
             borderRadius: '50%',
-            background: isDone
-              ? '#6C5CE7'
-              : isStreaming
-              ? '#A29BFE'
-              : '#2A2A3E',
+            background: isDone ? 'var(--accent)' : isStreaming ? 'var(--lavender)' : '#1E1E2E',
             flexShrink: 0,
-            boxShadow: isStreaming ? '0 0 8px rgba(162, 155, 254, 0.6)' : 'none',
+            boxShadow: isStreaming ? '0 0 8px rgba(79, 195, 247, 0.6)' : 'none',
             animation: isStreaming ? 'pulse-dot 1.2s ease-in-out infinite' : 'none',
             transition: 'background 0.3s ease',
           }}
         />
 
-        <span style={{ fontSize: '15px', color: '#6C5CE7', flexShrink: 0 }}>
+        <span style={{ fontSize: '15px', color: 'var(--accent)', flexShrink: 0 }}>
           {meta.icon}
         </span>
 
-        <span style={{ fontSize: '13px', fontWeight: 500, color: '#E8E8F0', flex: 1 }}>
+        <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', flex: 1 }}>
           {meta.label}
         </span>
 
         {loop > 1 && (
-          <span
-            style={{
-              fontSize: '10px',
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              color: '#6B7280',
-              background: '#1E1E2E',
-              padding: '2px 7px',
-              borderRadius: '4px',
-            }}
-          >
+          <span style={{
+            fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em',
+            color: 'var(--muted-dim)', background: '#1E1E2E',
+            padding: '2px 7px', borderRadius: '4px',
+          }}>
             LOOP {loop}
           </span>
         )}
 
         {isStreaming && (
-          <span style={{ fontSize: '11px', color: '#A29BFE', flexShrink: 0 }}>
+          <span style={{ fontSize: '11px', color: 'var(--lavender)', flexShrink: 0 }}>
             Writing…
           </span>
         )}
 
+        {isDone && output && (
+          <button className="copy-btn" onClick={handleCopy}>
+            {copied ? '✓ Copied' : 'Copy'}
+          </button>
+        )}
+
         {!isEmpty && (
-          <span style={{ color: '#6B7280', fontSize: '13px', flexShrink: 0 }}>
+          <span style={{ color: 'var(--muted-dim)', fontSize: '13px', flexShrink: 0 }}>
             {open ? '▲' : '▼'}
           </span>
         )}
       </button>
 
-      {/* Body */}
+      {/* Skeleton state */}
+      {isEmpty && !isStreaming && (
+        <div style={{ padding: '0 18px 14px' }}>
+          <div className="skeleton" style={{ height: 10, width: '80%', marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 10, width: '55%' }} />
+        </div>
+      )}
+
       {open && !isEmpty && (
         <div
           ref={bodyRef}
           style={{
             padding: '0 18px 18px',
-            borderTop: '1px solid #1E1E2E',
+            borderTop: '1px solid var(--border)',
             maxHeight: '420px',
             overflowY: 'auto',
           }}
